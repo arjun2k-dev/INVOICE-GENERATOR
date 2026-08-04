@@ -1,11 +1,29 @@
-# IDEs and Editors
+# ==========================================
+# IDE & System Files
+# ==========================================
 .idea/
 .vscode/
 *.iml
 *.classpath
 *.project
 *.settings/
-
-# OS Files
 .DS_Store
 Thumbs.db
+
+# ==========================================
+# Backend Ignored Files (Spring Boot / Maven)
+# ==========================================
+invoice_generator/target/
+invoice_generator/*.class
+invoice_generator/.mvn/
+invoice_generator/*.jar
+invoice_generator/*.war
+
+# ==========================================
+# Frontend Ignored Files (React / Vite)
+# ==========================================
+invoice-generatorFREND/node_modules/
+invoice-generatorFREND/dist/
+invoice-generatorFREND/.env.local
+invoice-generatorFREND/.env.development.local
+invoice-generatorFREND/.env.production.local
