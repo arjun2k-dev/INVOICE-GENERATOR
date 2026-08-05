@@ -1,8 +1,24 @@
-# Maven / Gradle Build Outputs
-target/
-build/
-.mvn/
+# Compiled class files & build artifacts
+/target/
+/*.jar
+/*.war
+/*.ear
 
-# Compiled Classes & Logs
-*.class
+# Spring Boot & Database temporary files
 *.log
+*.db
+
+# Eclipse / IntelliJ / NetBeans project metadata
+/.apt_generated
+/.classpath
+/.factorypath
+/.project
+/.settings
+/.springBeans
+/.sts4-cache
+/bin/
+*.iml
+
+# Mac / Windows files
+.DS_Store
+Thumbs.db

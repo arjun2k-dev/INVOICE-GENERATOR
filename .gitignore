@@ -1,8 +1,17 @@
-# IDE Files
-.idea/
-.vscode/
-*.iml
-
-# OS Files
+# Operating System files
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.tmp
+*.bak
+*.log
+*.iml
+
+# Ignore nested .git directories (Prevents orange submodule issue)
+!/**/.git/

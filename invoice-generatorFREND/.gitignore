@@ -1,9 +1,14 @@
-# Node Dependencies & Build Outputs
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+dist-ssr/
 build/
 
-# Environment Variables & Logs
+# Local environment variables
 .env.local
-.env.development.local
-npm-debug.log*
+.env.*.local
+
+# Logs
+*.log
