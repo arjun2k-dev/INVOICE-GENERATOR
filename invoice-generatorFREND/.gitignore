@@ -1,29 +1,9 @@
-# Dependencies (NEVER push to Git)
+# Node Dependencies & Build Outputs
 node_modules/
-.pnpm-store/
-
-# Production build outputs
 dist/
-dist-isolated/
 build/
 
-# Local Environment Variables & Secrets
+# Environment Variables & Logs
 .env.local
 .env.development.local
-.env.test.local
-.env.production.local
-
-# Editor & IDE settings
-.vscode/
-.idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# System & Cache
-.DS_Store
-Thumbs.db
-.eslintcache
-.vite/
+npm-debug.log*

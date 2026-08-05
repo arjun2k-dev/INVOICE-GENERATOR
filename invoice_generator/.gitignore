@@ -1,22 +1,8 @@
-# Maven build output
+# Maven / Gradle Build Outputs
 target/
-*.class
-
-# Maven wrapper folder
+build/
 .mvn/
 
-# Compiled archives
-*.jar
-*.war
-*.ear
-
-# Logs and environment variables
+# Compiled Classes & Logs
+*.class
 *.log
-.env
-
-# Eclipse & IntelliJ project files
-.idea/
-*.iml
-.classpath
-.project
-.settings/
