@@ -60,7 +60,10 @@ public class SecurityConfig {
 
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/v1/auth/**", "/ws-ledger/**").permitAll()
+
                         .requestMatchers("/api/v1/auth/**",
                                 "/",
                                 "/favicon.ico",
@@ -83,6 +86,9 @@ public class SecurityConfig {
                         // Standard user/admin invoice endpoints
                         .requestMatchers("/api/v1/invoices/**").hasAnyRole("USER", "ADMIN")
                         .anyRequest().authenticated()
+
+
+
                 )
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))

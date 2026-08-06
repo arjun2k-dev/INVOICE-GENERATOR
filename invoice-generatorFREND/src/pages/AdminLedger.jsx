@@ -1,14 +1,19 @@
 /* eslint-disable react-hooks/set-state-in-effect */
+// src/pages/AdminLedger.jsx
 import { useState, useEffect } from 'react';
 import { invoiceApi } from '../api/invoiceApi';
 import { StatusBadge } from '../components/StatusBadge';
+import { useAuth } from '../context/AuthContext';
+import { createWebSocketClient } from '../api/websocketService';
 
 export const AdminLedger = () => {
+  const { token } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(null); // Tracks ID of row currently updating
+  const [actionLoading, setActionLoading] = useState(null);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [liveBanner, setLiveBanner] = useState('');
 
   const fetchGlobalLedger = async () => {
     setLoading(true);
@@ -24,7 +29,30 @@ export const AdminLedger = () => {
 
   useEffect(() => {
     fetchGlobalLedger();
-  }, []);
+
+    // Connect to WebSocket STOMP for Live Admin Feed
+    let _client = null;
+    if (token) {
+      _client = createWebSocketClient(token, (client) => {
+        // Feature 1: Subscribe to public Admin Feed
+        client.subscribe('/topic/admin/invoices', (message) => {
+          const newInvoice = JSON.parse(message.body);
+          
+          // Prepend newly submitted invoice to the table immediately
+          setInvoices((prev) => [newInvoice, ...prev.filter((inv) => inv.id !== newInvoice.id)]);
+          setLiveBanner(`⚡ Live Alert: New invoice #${newInvoice.invoiceNumber} submitted by ${newInvoice.username}`);
+          
+          setTimeout(() => setLiveBanner(''), 5000);
+        });
+      });
+    }
+
+    return () => {
+      if (_client) {
+        _client.deactivate();
+      }
+    };
+  }, [token]);
 
   const handleStatusUpdate = async (id, newStatus) => {
     setActionLoading(id);
@@ -34,12 +62,11 @@ export const AdminLedger = () => {
     try {
       const updatedInvoice = await invoiceApi.updateInvoiceStatus(id, newStatus);
       
-      // Update state locally for instantaneous UI response
-      setInvoices((prevInvoices) =>
-        prevInvoices.map((inv) => (inv.id === id ? updatedInvoice : inv))
+      setInvoices((prev) =>
+        prev.map((inv) => (inv.id === id ? updatedInvoice : inv))
       );
 
-      setSuccessMsg(`Invoice #${updatedInvoice.invoiceNumber} status set to ${newStatus}.`);
+      setSuccessMsg(`Invoice #${updatedInvoice.invoiceNumber} set to ${newStatus}.`);
     } catch (err) {
       setError(err.message || `Failed to update status for invoice ID ${id}.`);
     } finally {
@@ -56,18 +83,26 @@ export const AdminLedger = () => {
             <i className="bi bi-shield-lock-fill text-warning me-2"></i>
             Enterprise Admin Ledger
           </h2>
-          <p className="text-muted mb-0">Global invoice audit and approval console</p>
+          <p className="text-muted mb-0">Global invoice audit console with Real-Time STOMP Feed</p>
         </div>
         <button
           className="btn btn-outline-secondary btn-sm mt-3 mt-md-0 d-flex align-items-center gap-1"
           onClick={fetchGlobalLedger}
           disabled={loading}
         >
-          <i className="bi bi-arrow-clockwise"></i> Refresh Data
+          <i className="bi bi-arrow-clockwise"></i> Refresh
         </button>
       </div>
 
-      {/* Dynamic Alerts */}
+      {/* Live STOMP Event Banner */}
+      {liveBanner && (
+        <div className="alert alert-info alert-dismissible fade show fw-semibold" role="alert">
+          <i className="bi bi-broadcast me-2 text-danger"></i>
+          {liveBanner}
+        </div>
+      )}
+
+      {/* Alerts */}
       {successMsg && (
         <div className="alert alert-success alert-dismissible fade show small" role="alert">
           <i className="bi bi-check-circle-fill me-2"></i>
@@ -84,7 +119,7 @@ export const AdminLedger = () => {
         </div>
       )}
 
-      {/* Global Ledger Table */}
+      {/* Ledger Table */}
       <div className="card shadow-sm border-0 rounded-3">
         <div className="card-header bg-white py-3">
           <h5 className="card-title fw-bold mb-0 text-secondary">All Submitted Invoices</h5>
@@ -93,12 +128,12 @@ export const AdminLedger = () => {
           {loading ? (
             <div className="text-center py-5">
               <div className="spinner-border text-primary" role="status"></div>
-              <p className="text-muted small mt-2">Fetching global audit ledger...</p>
+              <p className="text-muted small mt-2">Loading ledger...</p>
             </div>
           ) : invoices.length === 0 ? (
             <div className="text-center py-5">
               <i className="bi bi-journal-x text-muted display-4"></i>
-              <p className="text-muted mt-2">No global invoice records found in database.</p>
+              <p className="text-muted mt-2">No invoices found.</p>
             </div>
           ) : (
             <div className="table-responsive">
@@ -107,10 +142,10 @@ export const AdminLedger = () => {
                   <tr>
                     <th scope="col" className="ps-4">ID</th>
                     <th scope="col">Invoice #</th>
-                    <th scope="col">Submitted By</th>
-                    <th scope="col">Vendor Name</th>
+                    <th scope="col">User</th>
+                    <th scope="col">Vendor</th>
                     <th scope="col">Amount</th>
-                    <th scope="col">Created Date</th>
+                    <th scope="col">Date</th>
                     <th scope="col" className="text-center">Status</th>
                     <th scope="col" className="text-end pe-4">Actions</th>
                   </tr>
@@ -138,25 +173,15 @@ export const AdminLedger = () => {
                               className="btn btn-outline-success"
                               onClick={() => handleStatusUpdate(inv.id, 'APPROVED')}
                               disabled={inv.status === 'APPROVED'}
-                              title="Approve Invoice"
                             >
-                              <i className="bi bi-check-lg"></i> Approve
+                              Approve
                             </button>
                             <button
                               className="btn btn-outline-danger"
                               onClick={() => handleStatusUpdate(inv.id, 'REJECTED')}
                               disabled={inv.status === 'REJECTED'}
-                              title="Reject Invoice"
                             >
-                              <i className="bi bi-x-lg"></i> Reject
-                            </button>
-                            <button
-                              className="btn btn-outline-warning"
-                              onClick={() => handleStatusUpdate(inv.id, 'PENDING')}
-                              disabled={inv.status === 'PENDING'}
-                              title="Reset to Pending"
-                            >
-                              <i className="bi bi-clock-history"></i> Reset
+                              Reject
                             </button>
                           </div>
                         )}

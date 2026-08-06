@@ -1,18 +1,21 @@
 /* eslint-disable react-hooks/set-state-in-effect */
+// src/pages/UserDashboard.jsx
 import { useState, useEffect } from 'react';
 import { invoiceApi } from '../api/invoiceApi';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
+import { createWebSocketClient } from '../api/websocketService';
+import { LiveNotificationToast } from '../components/LiveNotificationToast';
 
 export const UserDashboard = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [activeNotification, setActiveNotification] = useState(null);
 
-  // Form state for creating new invoice
   const [formData, setFormData] = useState({
     invoiceNumber: '',
     amount: '',
@@ -25,7 +28,7 @@ export const UserDashboard = () => {
       const data = await invoiceApi.getMyInvoices();
       setInvoices(data || []);
     } catch (err) {
-      setError(err.message || 'Failed to fetch your invoices.');
+      setError(err.message || 'Failed to fetch invoices.');
     } finally {
       setLoading(false);
     }
@@ -33,7 +36,32 @@ export const UserDashboard = () => {
 
   useEffect(() => {
     fetchInvoices();
-  }, []);
+
+    // Feature 2: Connect to STOMP for Real-Time User Notifications
+    let _client = null;
+    if (token && user?.username) {
+      _client = createWebSocketClient(token, (client) => {
+        // 🟢 STEP 2 FIX: Subscribe to the public user-specific topic matching backend broadcast
+        client.subscribe(`/topic/notifications/${user.username}`, (message) => {
+          const updatedInvoice = JSON.parse(message.body);
+
+          // Update local status in table instantly without page refresh
+          setInvoices((prev) =>
+            prev.map((inv) => (Number(inv.id) === Number(updatedInvoice.invoiceId) ? { ...inv, status: updatedInvoice.status } : inv))
+          );
+
+          // Trigger Live Toast Notification
+          setActiveNotification(updatedInvoice);
+        });
+      });
+    }
+
+    return () => {
+      if (_client) {
+        _client.deactivate();
+      }
+    };
+  }, [token, user?.username]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -47,23 +75,17 @@ export const UserDashboard = () => {
     setSubmitting(true);
 
     try {
-      const payload = {
-        ...formData,
-        amount: parseFloat(formData.amount),
-      };
-
+      const payload = { ...formData, amount: parseFloat(formData.amount) };
       await invoiceApi.createInvoice(payload);
+      
       setSuccessMsg('Invoice created successfully!');
       setFormData({ invoiceNumber: '', amount: '', vendorName: '' });
 
-      // Close modal programmatically via Bootstrap JS
       const modalEl = document.getElementById('createInvoiceModal');
       const modalInstance = window.bootstrap?.Modal?.getInstance(modalEl);
-      if (modalInstance) {
-        modalInstance.hide();
-      }
+      if (modalInstance) modalInstance.hide();
 
-      fetchInvoices(); // Refresh invoice list
+      fetchInvoices();
     } catch (err) {
       setError(err.message || 'Failed to submit invoice.');
     } finally {
@@ -73,7 +95,13 @@ export const UserDashboard = () => {
 
   return (
     <div className="container py-4">
-      {/* Dashboard Header */}
+      {/* Toast Alert */}
+      <LiveNotificationToast
+        notification={activeNotification}
+        onClose={() => setActiveNotification(null)}
+      />
+
+      {/* Header */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 pb-2 border-bottom">
         <div>
           <h2 className="fw-bold mb-1">Invoice Dashboard</h2>
@@ -90,7 +118,7 @@ export const UserDashboard = () => {
         </button>
       </div>
 
-      {/* Dynamic Alerts */}
+      {/* Alerts */}
       {successMsg && (
         <div className="alert alert-success alert-dismissible fade show small" role="alert">
           <i className="bi bi-check-circle-fill me-2"></i>
@@ -107,7 +135,7 @@ export const UserDashboard = () => {
         </div>
       )}
 
-      {/* Invoices Table Card */}
+      {/* Table */}
       <div className="card shadow-sm border-0 rounded-3">
         <div className="card-header bg-white py-3">
           <h5 className="card-title fw-bold mb-0 text-secondary">My Invoices</h5>
@@ -116,7 +144,6 @@ export const UserDashboard = () => {
           {loading ? (
             <div className="text-center py-5">
               <div className="spinner-border text-primary" role="status"></div>
-              <p className="text-muted small mt-2">Loading your invoices...</p>
             </div>
           ) : invoices.length === 0 ? (
             <div className="text-center py-5">
@@ -156,28 +183,14 @@ export const UserDashboard = () => {
         </div>
       </div>
 
-      {/* Bootstrap Modal - Create Invoice */}
-      <div
-        className="modal fade"
-        id="createInvoiceModal"
-        tabIndex="-1"
-        aria-labelledby="createInvoiceModalLabel"
-        aria-hidden="true"
-      >
+      {/* Modal - Create Invoice */}
+      <div className="modal fade" id="createInvoiceModal" tabIndex="-1">
         <div className="modal-dialog modal-dialog-centered">
           <div className="modal-content border-0 shadow-lg">
             <div className="modal-header bg-primary text-white">
-              <h5 className="modal-title fw-bold" id="createInvoiceModalLabel">
-                <i className="bi bi-file-earmark-plus me-2"></i>New Invoice Submission
-              </h5>
-              <button
-                type="button"
-                className="btn-close btn-close-white"
-                data-bs-dismiss="modal"
-                aria-label="Close"
-              ></button>
+              <h5 className="modal-title fw-bold">New Invoice Submission</h5>
+              <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-
             <form onSubmit={handleSubmit}>
               <div className="modal-body p-4">
                 <div className="mb-3">
@@ -192,7 +205,6 @@ export const UserDashboard = () => {
                     required
                   />
                 </div>
-
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Vendor Name</label>
                   <input
@@ -201,11 +213,10 @@ export const UserDashboard = () => {
                     name="vendorName"
                     value={formData.vendorName}
                     onChange={handleChange}
-                    placeholder="e.g. Acme Corp"
+                    placeholder="e.g. AWS"
                     required
                   />
                 </div>
-
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Amount ($)</label>
                   <input
@@ -221,20 +232,12 @@ export const UserDashboard = () => {
                   />
                 </div>
               </div>
-
               <div className="modal-footer bg-light">
                 <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary fw-bold" disabled={submitting}>
-                  {submitting ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-                      Submitting...
-                    </>
-                  ) : (
-                    'Submit Invoice'
-                  )}
+                  {submitting ? 'Submitting...' : 'Submit Invoice'}
                 </button>
               </div>
             </form>
