@@ -1,31 +1,33 @@
 /* eslint-disable react-refresh/only-export-components */
-import  { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState,  } from 'react';
 import { authApi } from '../api/authApi';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('userData');
+    const savedUser = sessionStorage.getItem('userData');
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
   const [token, setToken] = useState(() => {
-    return localStorage.getItem('jwtToken') || null;
+    return sessionStorage.getItem('jwtToken') || null;
   });
 
   const [loading, setLoading] = useState(false);
 
-  // Synchronize state changes with localStorage
-  useEffect(() => {
-    if (token && user) {
-      localStorage.setItem('jwtToken', token);
-      localStorage.setItem('userData', JSON.stringify(user));
+  // Helper to synchronously update state and sessionStorage simultaneously
+  const saveAuthData = (jwtToken, userData) => {
+    if (jwtToken && userData) {
+      sessionStorage.setItem('jwtToken', jwtToken);
+      sessionStorage.setItem('userData', JSON.stringify(userData));
     } else {
-      localStorage.removeItem('jwtToken');
-      localStorage.removeItem('userData');
+      sessionStorage.removeItem('jwtToken');
+      sessionStorage.removeItem('userData');
     }
-  }, [token, user]);
+    setToken(jwtToken);
+    setUser(userData);
+  };
 
   /**
    * Helper function to store response auth payload
@@ -33,9 +35,9 @@ export const AuthProvider = ({ children }) => {
   const handleAuthSuccess = (response) => {
     const { token: jwtToken, username, email, roles } = response;
     const userData = { username, email, roles };
-    
-    setToken(jwtToken);
-    setUser(userData);
+
+    // Synchronously save to sessionStorage BEFORE React state / navigation triggers
+    saveAuthData(jwtToken, userData);
     return response;
   };
 
@@ -69,10 +71,7 @@ export const AuthProvider = ({ children }) => {
    * Logout user and clear tokens
    */
   const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('jwtToken');
-    localStorage.removeItem('userData');
+    saveAuthData(null, null);
   };
 
   /**

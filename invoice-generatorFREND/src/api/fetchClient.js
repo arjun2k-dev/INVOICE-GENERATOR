@@ -8,16 +8,18 @@ const BASE_URL = 'http://localhost:8080/api/v1';
  * @returns {Promise<any>} Parsed JSON or text response
  */
 export async function fetchClient(endpoint, options = {}) {
-  const token = localStorage.getItem('jwtToken');
+  const token = sessionStorage.getItem('jwtToken');
 
   const defaultHeaders = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   };
 
-  // Inject Authorization Bearer token if present in LocalStorage
-  if (token) {
-    defaultHeaders['Authorization'] = `Bearer ${token}`;
+  // Inject Authorization Bearer token if present and valid in sessionStorage
+  if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {
+    // Ensure no accidental quotes exist around token
+    const cleanToken = token.replace(/^"(.*)"$/, '$1');
+    defaultHeaders['Authorization'] = `Bearer ${cleanToken}`;
   }
 
   const config = {
